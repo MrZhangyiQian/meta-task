@@ -1,3 +1,4 @@
+// 136. 只出现一次的数字：
 func singleNumber(nums []int) int {
     // 1 2 2 3 1
     var freq map[int]bool
@@ -14,4 +15,49 @@ func singleNumber(nums []int) int {
         return key
     } 
     return -1
+}
+
+func singleNumber(nums []int) int {
+    // 1 2 2 3 1   满足交换率结合律， 
+    index := 0
+    for _;num := range(nums){
+      index ^= num
+}
+ return index
+}
+
+// 有效的括号 
+func isValid(s string) bool {
+    // 检查长度是否为奇数
+    if len(s)%2 == 1 {
+        return false
+    }
+    
+    // 括号映射：右括号 -> 左括号
+    pairs := map[byte]byte{
+        ')': '(',
+        ']': '[',
+        '}': '{',
+    }
+    
+    // 使用栈保存左括号
+    stack := []byte{}
+    
+    for i := 0; i < len(s); i++ {
+        // 如果当前字符是右括号（pairs[s[i]]存在）
+        if char, exists := pairs[s[i]]; exists {
+            // 检查栈是否为空或栈顶不匹配
+            if len(stack) == 0 || stack[len(stack)-1] != pairs[s[i]] {
+                return false
+            }
+            // 弹出匹配的左括号
+            stack = stack[:len(stack)-1]
+        } else {
+            // 否则（左括号或其他字符）压入栈
+            stack = append(stack, s[i])
+        }
+    }
+    
+    // 检查所有括号是否都已匹配
+    return len(stack) == 0
 }
