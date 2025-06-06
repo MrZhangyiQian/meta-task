@@ -1,0 +1,17 @@
+func singleNumber(nums []int) int {
+    // 1 2 2 3 1
+    var freq map[int]bool
+    freq = make(map[int]bool)
+    for _,value := range nums{
+        if(freq[value]){
+            delete(freq,value)
+        }else{
+            freq[value] = true
+        }
+    }
+
+    for key :=  range freq{
+        return key
+    } 
+    return -1
+}
