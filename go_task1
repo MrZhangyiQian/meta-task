@@ -139,3 +139,15 @@ func plusOne(digits []int) []int {
     return digits
 }
 
+// 两数之和
+func twoSum(nums []int, target int) []int {
+    hp := map[int]int{}
+    for i, x:= range nums{
+        if p,ok := hp[target-x]; ok{
+            return []int{p,i}
+        }
+        hp[x] = i
+    }
+    return nil
+    
+}
