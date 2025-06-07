@@ -1,1 +1,286 @@
+// 题目 ：编写一个Go程序，定义一个函数，该函数接收一个整数指针作为参数，在函数内部将该指针指向的值增加10，然后在主函数中调用该函数并输出修改后的值。
+// 考察点 ：指针的使用、值传递与引用传递的区别。
 
+func test01(pt *int) {
+	*pt += 10
+}
+
+func main() {
+	var value int = 10
+	var ip *int
+	ip = &value
+	test01(ip)
+	fmt.Println(value)
+}
+
+// 题目 ：实现一个函数，接收一个整数切片的指针，将切片中的每个元素乘以2。
+func test02(pt *[]int) {
+	for i, v := range *pt {
+		(*pt)[i] = v * 2
+	}
+}
+
+// 编写一个程序，使用 go 关键字启动两个协程，一个协程打印从1到10的奇数，另一个协程打印从2到10的偶数
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+func main() {
+	// 使用 WaitGroup 确保主程序等待所有协程完成
+	var wg sync.WaitGroup
+	wg.Add(2) // 等待两个协程完成
+
+	// 创建无缓冲通道用于同步
+	ch := make(chan struct{})
+
+	// 打印奇数的协程
+	go func() {
+		defer wg.Done()
+		// 确保先打印奇数
+		ch <- struct{}{}
+		
+		for i := 1; i <= 10; i += 2 {
+			fmt.Printf("奇数协程: %d\n", i)
+		}
+	}()
+
+	// 打印偶数的协程
+	go func() {
+		defer wg.Done()
+		// 等待接收信号后再开始打印
+		<-ch
+		
+		for i := 2; i <= 10; i += 2 {
+			fmt.Printf("偶数协程: %d\n", i)
+		}
+	}()
+
+	// 等待所有协程完成
+	wg.Wait()
+	fmt.Println("所有数字打印完毕!")
+}
+
+// 设计一个任务调度器，接收一组任务（可以用函数表示），并使用协程并发执行这些任务，同时统计每个任务的执行时间。
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+// Task 表示一个可执行的任务
+type Task struct {
+	ID       int
+	Name     string
+	Function func() // 任务执行的函数
+}
+
+// TaskResult 存储任务执行结果
+type TaskResult struct {
+	TaskID   int
+	TaskName string
+	Start    time.Time
+	End      time.Time
+	Duration time.Duration
+	Success  bool
+	Error    error
+}
+
+// Scheduler 任务调度器
+type Scheduler struct {
+	tasks      chan Task
+	results    chan TaskResult
+	wg         sync.WaitGroup
+	maxWorkers int
+	taskCount  int
+	completed  int
+	mu         sync.Mutex
+}
+
+// NewScheduler 创建新的任务调度器
+func NewScheduler(maxWorkers int) *Scheduler {
+	return &Scheduler{
+		tasks:      make(chan Task, 100),
+		results:    make(chan TaskResult, 100),
+		maxWorkers: maxWorkers,
+	}
+}
+
+// AddTask 添加任务到调度器
+func (s *Scheduler) AddTask(task Task) {
+	s.mu.Lock()
+	s.taskCount++
+	s.mu.Unlock()
+	s.tasks <- task
+}
+
+// Start 启动任务调度器
+func (s *Scheduler) Start() {
+	// 启动worker协程
+	for i := 0; i < s.maxWorkers; i++ {
+		s.wg.Add(1)
+		go s.worker(i)
+	}
+
+	// 启动结果收集器
+	go s.collectResults()
+}
+
+// WaitAndGetResults 等待所有任务完成并返回结果
+func (s *Scheduler) WaitAndGetResults() []TaskResult {
+	close(s.tasks)   // 不再接收新任务
+	s.wg.Wait()      // 等待所有worker完成
+	close(s.results) // 关闭结果通道
+
+	// 收集最终结果
+	var allResults []TaskResult
+	for result := range s.results {
+		allResults = append(allResults, result)
+	}
+
+	// 按任务ID排序
+	for i := 0; i < len(allResults)-1; i++ {
+		for j := i + 1; j < len(allResults); j++ {
+			if allResults[i].TaskID > allResults[j].TaskID {
+				allResults[i], allResults[j] = allResults[j], allResults[i]
+			}
+		}
+	}
+
+	return allResults
+}
+
+// worker 工作协程
+func (s *Scheduler) worker(workerID int) {
+	defer s.wg.Done()
+
+	for task := range s.tasks {
+		// 记录开始时间
+		start := time.Now()
+
+		// 执行任务
+		success := true
+		var err error
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					success = false
+					err = fmt.Errorf("panic: %v", r)
+				}
+			}()
+
+			task.Function()
+		}()
+
+		// 记录结束时间
+		end := time.Now()
+		duration := end.Sub(start)
+
+		// 发送结果
+		result := TaskResult{
+			TaskID:   task.ID,
+			TaskName: task.Name,
+			Start:    start,
+			End:      end,
+			Duration: duration,
+			Success:  success,
+			Error:    err,
+		}
+		s.results <- result
+
+		// 更新进度
+		s.mu.Lock()
+		s.completed++
+		progress := float64(s.completed) / float64(s.taskCount) * 100
+		s.mu.Unlock()
+
+		fmt.Printf("[Worker %d] Completed task %d: %s (%.1f%%)\n",
+			workerID, task.ID, task.Name, progress)
+	}
+}
+
+// collectResults 收集结果（用于实时统计）
+func (s *Scheduler) collectResults() {
+	for result := range s.results {
+		s.mu.Lock()
+		fmt.Printf("→ Result: Task %d (%s) took %v\n",
+			result.TaskID, result.TaskName, result.Duration)
+		s.mu.Unlock()
+	}
+}
+
+// 示例任务函数
+func main() {
+	// 创建调度器，最多4个并发worker
+	scheduler := NewScheduler(4)
+
+	// 添加一些示例任务
+	scheduler.AddTask(Task{ID: 1, Name: "Quick Task", Function: func() {
+		time.Sleep(200 * time.Millisecond)
+	}})
+
+	scheduler.AddTask(Task{ID: 2, Name: "Medium Task", Function: func() {
+		time.Sleep(500 * time.Millisecond)
+	}})
+
+	scheduler.AddTask(Task{ID: 3, Name: "Slow Task", Function: func() {
+		time.Sleep(1 * time.Second)
+	}})
+
+	scheduler.AddTask(Task{ID: 4, Name: "Failing Task", Function: func() {
+		time.Sleep(300 * time.Millisecond)
+		panic("something went wrong!")
+	}})
+
+	scheduler.AddTask(Task{ID: 5, Name: "Final Task", Function: func() {
+		time.Sleep(400 * time.Millisecond)
+	}})
+
+	// 启动调度器
+	scheduler.Start()
+
+	// 等待所有任务完成并获取结果
+	fmt.Println("\nStarting task execution...")
+	results := scheduler.WaitAndGetResults()
+
+	// 打印最终报告
+	fmt.Println("\nTask Execution Report:")
+	fmt.Println("====================================")
+	for _, res := range results {
+		status := "✅"
+		if !res.Success {
+			status = "❌"
+		}
+		fmt.Printf("%s Task %d (%s)\n", status, res.TaskID, res.TaskName)
+		fmt.Printf("   Start:    %s\n", res.Start.Format("15:04:05.000"))
+		fmt.Printf("   End:      %s\n", res.End.Format("15:04:05.000"))
+		fmt.Printf("   Duration: %v\n", res.Duration)
+		if res.Error != nil {
+			fmt.Printf("   Error:    %v\n", res.Error)
+		}
+		fmt.Println("------------------------------------")
+	}
+
+	// 统计汇总
+	var totalDuration time.Duration
+	var successCount int
+	for _, res := range results {
+		totalDuration += res.Duration
+		if res.Success {
+			successCount++
+		}
+	}
+
+	fmt.Printf("\nSUMMARY:\n")
+	fmt.Printf("Tasks Completed: %d/%d\n", successCount, len(results))
+	fmt.Printf("Total Time:      %v\n", totalDuration)
+	var averageTime time.Duration
+	if len(results) > 0 {
+		averageTime = totalDuration / time.Duration(len(results))
+	}
+	fmt.Printf("Average Time:    %v\n", averageTime)
+}
