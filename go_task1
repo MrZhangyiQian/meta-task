@@ -61,3 +61,23 @@ func isValid(s string) bool {
     // 检查所有括号是否都已匹配
     return len(stack) == 0
 }
+
+func isValid(s string) bool {
+	stack := make([]byte, 1000000)
+	top := -1
+	for _, c := range s {
+		if c == '[' || c == '{' || c == '(' {
+			top++
+			stack[top] = byte(c)
+		} else if top > -1 && match(stack[top], byte(c)) {
+			top--
+		} else {
+			return false
+		}
+	}
+	return top == -1
+}
+
+func match(a, b byte) bool {
+	return (a == '[' && b == ']') || (a == '{' && b == '}') || (a == '(' && b == ')')
+}
