@@ -284,3 +284,62 @@ func main() {
 	}
 	fmt.Printf("Average Time:    %v\n", averageTime)
 }
+
+// 定义一个 Shape 接口，包含 Area() 和 Perimeter() 两个方法。然后创建 Rectangle 和 Circle 结构体，实现 Shape 接口。在主函数中，创建这两个结构体的实例，并调用它们的 Area() 和 Perimeter() 方法。
+package main
+
+type Shape interface {
+	area() float64
+	perimeter() float64
+}
+
+
+package main
+
+import "math"
+
+type Circle struct {
+	radius float64
+}
+
+func (c *Circle) area() float64 {
+	return math.Pi * (c.radius * c.radius)
+}
+
+func (c *Circle) perimeter() float64 {
+	return c.radius * math.Pi
+}
+
+package main
+
+type Rectangle struct {
+	width, height float64
+}
+
+func (r *Rectangle) area() float64 {
+	//TODO implement me
+	return r.width * r.height
+}
+
+func (r *Rectangle) perimeter() float64 {
+	//TODO implement me
+	return 2 * (r.width + r.height)
+}
+
+
+// 通用测量函数，接受任何实现Shape接口的类型
+func measure(s Shape) {
+	fmt.Printf("面积: %.2f\n", s.area())
+	fmt.Printf("周长: %.2f\n", s.perimeter())
+}
+
+func main() {
+	rect := Rectangle{width: 5, height: 5}
+	circle := Circle{radius: 5}
+
+	fmt.Println("矩形：")
+	measure(&rect)
+
+	fmt.Println("圆形")
+	measure(&circle)
+}
