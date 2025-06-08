@@ -368,3 +368,101 @@ func (e *Employee) printInfo() {
 	fmt.Println("年龄：%d\n", e.age)
 	fmt.Println("员工id：%d\n", e.employeeId)
 }
+
+编写一个程序，使用通道实现两个协程之间的通信。一个协程生成从1到10的整数，并将这些整数发送到通道中，另一个协程从通道中接收这些整数并打印出来
+func main() {
+ch := make(chan int)
+	go func() {
+		for i := 0; i < 10; i++ {
+			ch <- i
+		}
+		close(ch)
+	}()
+
+	for v := range ch {
+		fmt.Println(v)
+	}
+}
+
+
+//编写一个程序，使用 sync.Mutex 来保护一个共享的计数器。启动10个协程，每个协程对计数器进行1000次递增操作，最后输出计数器的值。
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+func main() {
+	// 1. 创建共享计数器和互斥锁
+	var counter int
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// 2. 设置需要等待的协程数量
+	wg.Add(10)
+
+	// 3. 启动10个协程
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			defer wg.Done() // 协程结束时通知WaitGroup
+			
+			// 每个协程进行1000次递增操作
+			for j := 0; j < 1000; j++ {
+				mu.Lock()       // 加锁保护临界区
+				counter++       // 安全地递增计数器
+				mu.Unlock()     // 解锁
+			}
+			
+			fmt.Printf("协程 %d 完成1000次递增\n", id)
+		}(i) // 将循环变量作为参数传递避免闭包问题
+	}
+
+	// 4. 等待所有协程完成
+	wg.Wait()
+
+	// 5. 输出最终结果
+	fmt.Printf("最终计数器值: %d\n", counter)
+	fmt.Printf("理论值: 10 * 1000 = %d\n", 10 * 1000)
+}
+
+// 使用原子操作（ sync/atomic 包）实现一个无锁的计数器。启动10个协程，每个协程对计数器进行1000次递增操作，最后输出计数器的值。
+package main
+
+import (
+	"fmt"
+	"sync"
+	"sync/atomic"
+)
+
+func main() {
+	// 1. 创建原子计数器（使用int64）
+	var counter int64 = 0
+	var wg sync.WaitGroup
+
+	// 2. 设置需要等待的协程数量
+	wg.Add(10)
+
+	// 3. 启动10个协程
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			defer wg.Done() // 协程结束时通知WaitGroup
+			
+			// 每个协程进行1000次原子递增操作
+			for j := 0; j < 1000; j++ {
+				// 原子操作递增计数器
+				atomic.AddInt64(&counter, 1)
+			}
+			
+			fmt.Printf("协程 %d 完成1000次原子递增\n", id)
+		}(i) // 将循环变量作为参数传递避免闭包问题
+	}
+
+	// 4. 等待所有协程完成
+	wg.Wait()
+
+	// 5. 输出最终结果
+	finalValue := atomic.LoadInt64(&counter)
+	fmt.Printf("最终计数器值: %d\n", finalValue)
+	fmt.Printf("理论值: 10 * 1000 = %d\n", 10 * 1000)
+}
