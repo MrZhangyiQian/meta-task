@@ -282,3 +282,63 @@ db, err := gorm.Open("mysql", "root:123456@(localhost)/dbname?charset=utf8mb4&pa
 		}
 	}
 }
+
+// 为 Post 模型添加一个钩子函数，在文章创建时自动更新用户的文章数量统计字段
+package ormtest
+
+import (
+	"github.com/jinzhu/gorm"
+)
+
+type Post struct {
+	Id       int    `gorm:"primary_key"`
+	Title    string `gorm:"size:255"`
+	Content  string
+	UserId   int
+	User     User
+	Comments []Comment
+}
+
+func (p *Post) BeforeCreate(tx *gorm.DB) (err error) {
+	// 查询用户
+	var user User
+	tx.Model(&User{}).Where("id = ?", p.UserId).First(&user)
+
+	// 更新用户文章数
+	user.PostCount++
+	tx.Save(&user)
+
+	return
+}
+
+func (p *Post) TableName() string {
+	return "post"
+}
+
+func main() {
+	db, err := gorm.Open("mysql", "root:123456@(localhost)/blog_db?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		panic("failed to connect database")
+	}
+	defer db.Close()
+
+	db.AutoMigrate(&User{}, &Post{})
+
+	// 创建用户
+	user := User{Name: "Alice"}
+	db.Create(&user)
+
+	// 创建文章
+	post := Post{
+		Title:   "My First Post",
+		Content: "Hello World!",
+		UserId:  user.ID,
+	}
+	db.Create(&post)
+
+	// 查看用户文章数是否增加
+	var updatedUser User
+	db.First(&updatedUser, user.ID)
+	fmt.Printf("User %s has %d posts\n", updatedUser.Name, updatedUser.PostCount)
+}
+
