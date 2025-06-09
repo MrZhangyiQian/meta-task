@@ -118,3 +118,29 @@ ELSE
     
     SELECT '转账成功' AS result;
 END IF;
+
+// 假设你已经使用Sqlx连接到一个数据库，并且有一个 employees 表，包含字段 id 、 name 、 department 、 salary 。
+// 要求 ：
+// 编写Go代码，使用Sqlx查询 employees 表中所有部门为 "技术部" 的员工信息，并将结果映射到一个自定义的 Employee 结构体切片中。
+// 编写Go代码，使用Sqlx查询 employees 表中工资最高的员工信息，并将结果映射到一个 Employee 结构体中。
+
+// 自动迁移
+	db.AutoMigrate(&dbtest.Employee{})
+	emp1 := dbtest.Employee{
+		Name: "张三",
+		Department: "技术部",
+		Salary: 5000,
+	}
+	emp2 := dbtest.Employee{
+		Name: "李四",
+		Department: "技术部",
+		Salary: 6000,
+	}
+	db.Create(&emp1)
+	db.Create(&emp2)
+	var employees []dbtest.Employee
+	db.Where("department = ?", "技术部").Find(&employees)
+	//编写Go代码，使用Sqlx查询 employees 表中工资最高的员工信息，并将结果映射到一个 Employee 结构体中。
+	var employee dbtest.Employee
+	db.Raw("SELECT * FROM employees ORDER BY salary DESC LIMIT 1").Scan(&employee)
+	fmt.Printf("Name: %s, Department: %s, Salary: %d\n", employee.Name, employee.Department, employee.Salary)
