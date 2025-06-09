@@ -218,3 +218,67 @@ db, err := gorm.Open("mysql", "root:123456@(localhost)/dbname?charset=utf8mb4&pa
 	defer db.Close()
 	db.AutoMigrate(&ormtest.Comment{}, &ormtest.Post{}, &ormtest.User{})
 }
+
+
+// 使用Gorm查询某个用户发布的所有文章及其对应的评论信息。
+func getUserPostsAndComments(db *gorm.DB, userID uint) ([]PostWithComments, error) {
+	var results []PostWithComments
+
+	rows, err := db.Table("post").
+		Select("post.id as post_id, post.title as post_title, post.content as post_content, comment.id, comment.content, comment.user_id, comment.post_id").
+		Joins("left join comment on post.id = comment.post_id").
+		Where("post.user_id = ?", userID).
+		Rows()
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pwc PostWithComments
+		var comment ormtest.Comment
+		// Scan into the structs manually
+		db.ScanRows(rows, &pwc)
+		db.ScanRows(rows, &comment)
+
+		// 判断是否已有该 Post，避免重复添加
+		found := false
+		for i, result := range results {
+			if result.PostID == pwc.PostID {
+				results[i].Comments = append(results[i].Comments, comment)
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			pwc.Comments = []ormtest.Comment{comment}
+			results = append(results, pwc)
+		}
+	}
+
+	return results, nil
+}
+
+func main(){
+db, err := gorm.Open("mysql", "root:123456@(localhost)/dbname?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	// 查询用户 ID=1 的所有文章及评论
+	userID := uint(1)
+	posts, err := getUserPostsAndComments(db, userID)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, post := range posts {
+		fmt.Printf("Post: %s\n", post.PostTitle)
+		for _, comment := range post.Comments {
+			fmt.Printf("  Comment: %s (by user %d)\n", comment.Content, comment.UserId)
+		}
+	}
+}
