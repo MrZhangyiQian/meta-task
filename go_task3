@@ -144,3 +144,20 @@ END IF;
 	var employee dbtest.Employee
 	db.Raw("SELECT * FROM employees ORDER BY salary DESC LIMIT 1").Scan(&employee)
 	fmt.Printf("Name: %s, Department: %s, Salary: %d\n", employee.Name, employee.Department, employee.Salary)
+
+//假设有一个 books 表，包含字段 id 、 title 、 author 、 price 。
+//要求 ：
+//定义一个 Book 结构体，包含与 books 表对应的字段。
+//编写Go代码，使用Sqlx执行一个复杂的查询，例如查询价格大于 50 元的书籍，并将结果映射到 Book 结构体切片中，确保类型安全。
+// 查询价格大于 50 的书籍
+	var books []Book
+	err = db.Select(&books, "SELECT * FROM books WHERE price > ?", 50)
+	if err != nil {
+		log.Fatalln("Query failed:", err)
+	}
+
+	// 打印结果
+	for _, book := range books {
+		fmt.Printf("ID: %d, Title: %s, Author: %s, Price: %.2f\n",
+			book.ID, book.Title, book.Author, book.Price)
+	}
