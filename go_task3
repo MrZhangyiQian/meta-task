@@ -43,3 +43,78 @@ func main() {
 		fmt.Printf("Name: %s, Age: %d, Grade: %s\n", students.Name, students.Age, students.Grade)
 	}
   }
+// 假设有两个表： accounts 表（包含字段 id 主键， balance 账户余额）和 transactions 表（包含字段 id 主键， from_account_id 转出账户ID， to_account_id 转入账户ID， amount 转账金额）。
+// 要求 ：
+// 编写一个事务，实现从账户 A 向账户 B 转账 100 元的操作。在事务中，需要先检查账户 A 的余额是否足够，如果足够则从账户 A 扣除 100 元，向账户 B 增加 100 元，并在 transactions 表中记录该笔转账信息。如果余额不足，则回滚事务
+CREATE TABLE accounts (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '账户ID',
+    balance DECIMAL(15, 2) NOT NULL DEFAULT 0.00 COMMENT '账户余额',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    
+    INDEX idx_balance (balance)
+) ENGINE=InnoDB;
+
+CREATE TABLE transactions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '交易ID',
+    from_account_id BIGINT NOT NULL COMMENT '转出账户ID',
+    to_account_id BIGINT NOT NULL COMMENT '转入账户ID',
+    amount DECIMAL(15, 2) NOT NULL COMMENT '转账金额',
+    transaction_time DATETIME NOT NULL COMMENT '交易时间',
+    status ENUM('PENDING', 'SUCCESS', 'FAILED') DEFAULT 'SUCCESS' COMMENT '交易状态',
+    
+    FOREIGN KEY (from_account_id) REFERENCES accounts(id),
+    FOREIGN KEY (to_account_id) REFERENCES accounts(id),
+    INDEX idx_time (transaction_time)
+) ENGINE=InnoDB;
+
+-- 1. 开始事务
+START TRANSACTION;
+
+-- 2. 声明变量存储账户余额
+SET @balanceA = 0;
+SET @balanceB = 0;
+
+-- 3. 检查账户 A 的余额（并加锁防止并发操作）
+SELECT balance INTO @balanceA 
+FROM accounts 
+WHERE id = A 
+FOR UPDATE; -- 行级锁，阻止其他事务修改
+
+-- 4. 检查账户 B 是否存在（也加锁）
+SELECT balance INTO @balanceB 
+FROM accounts 
+WHERE id = B 
+FOR UPDATE; 
+
+-- 5. 验证账户余额和账户存在
+IF @balanceA IS NULL THEN
+    ROLLBACK;
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '转出账户不存在';
+ELSEIF @balanceB IS NULL THEN
+    ROLLBACK;
+    SIGNAL SQLSTATE '45001' SET MESSAGE_TEXT = '转入账户不存在';
+ELSEIF @balanceA < 100 THEN
+    ROLLBACK;
+    SIGNAL SQLSTATE '45002' SET MESSAGE_TEXT = '账户余额不足';
+ELSE
+    -- 6. 执行转账操作
+    -- 6.1 从账户 A 扣除 100 元
+    UPDATE accounts 
+    SET balance = balance - 100 
+    WHERE id = A;
+    
+    -- 6.2 向账户 B 增加 100 元
+    UPDATE accounts 
+    SET balance = balance + 100 
+    WHERE id = B;
+    
+    -- 6.3 记录转账信息
+    INSERT INTO transactions (from_account_id, to_account_id, amount, transaction_time)
+    VALUES (A, B, 100, NOW());
+    
+    -- 7. 提交事务
+    COMMIT;
+    
+    SELECT '转账成功' AS result;
+END IF;
